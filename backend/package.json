@@ -1,0 +1,16 @@
+{
+  "name": "anuvarnika-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute anuvarnika_db --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute anuvarnika_db --remote --file=schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "^5",
+    "wrangler": "^4.113.0"
+  }
+}

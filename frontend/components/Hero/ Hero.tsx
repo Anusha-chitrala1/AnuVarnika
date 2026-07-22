@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Hero() {
   return (
@@ -47,9 +48,12 @@ export default function Hero() {
 
         <div>
 
-          <img
+          <Image
             src="/hero-saree.png"
             alt="AnuVarnika Sarees"
+            width={520}
+            height={620}
+            priority
             className="w-[520px]"
           />
 
