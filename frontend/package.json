@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "npm run build && unset CLOUDFLARE_API_TOKEN && npx wrangler pages deploy out --project-name anuvarnika-store --branch main"
   },
   "dependencies": {
     "next": "16.2.10",

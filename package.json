@@ -1,0 +1,13 @@
+{
+  "name": "anuvarnika",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "deploy": "npm run deploy:api",
+    "deploy:api": "unset CLOUDFLARE_API_TOKEN && npm --prefix backend run deploy",
+    "db:remote": "unset CLOUDFLARE_API_TOKEN && npm --prefix backend run db:remote"
+  }
+}

@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Cloudflare Wrangler local state
+.wrangler/
+backend/.wrangler/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+.next/
+out/
+build/
+
+# Logs
+npm-debug.log*
+wrangler-debug.log*

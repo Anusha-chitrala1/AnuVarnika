@@ -37,6 +37,14 @@ export default {
     if (request.method === "OPTIONS") return json(null, 204, origin);
 
     try {
+      if (url.pathname === "/" && request.method === "GET") {
+        return json({
+          name: "AnuVarnika API",
+          status: "online",
+          endpoints: ["/health", "/api/products", "/api/categories", "/api/contact", "/api/orders"],
+        }, 200, origin);
+      }
+
       if (url.pathname === "/health" && request.method === "GET") {
         return json({ ok: true, service: "anuvarnika-api" }, 200, origin);
       }
