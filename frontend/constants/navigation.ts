@@ -5,15 +5,15 @@ export const NAVIGATION_LINKS = [
   },
   {
     name: "Collections",
-    href: "/collections",
+    href: "/products",
   },
   {
     name: "New Arrivals",
-    href: "/new-arrivals",
+    href: "/products",
   },
   {
     name: "Best Sellers",
-    href: "/best-sellers",
+    href: "/products",
   },
   {
     name: "About Us",

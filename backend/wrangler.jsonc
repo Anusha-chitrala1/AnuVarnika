@@ -13,5 +13,6 @@
   ],
   "vars": {
     "ALLOWED_ORIGIN": "https://anuvarnika-store.pages.dev"
-  }
+  },
+  // Set AUTH_SECRET in Cloudflare dashboard for production (never commit secrets).
 }
