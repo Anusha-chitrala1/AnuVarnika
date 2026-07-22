@@ -23,7 +23,7 @@ export async function hashPassword(password: string): Promise<string> {
     ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as unknown as BufferSource, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     key,
     256,
   );
@@ -43,7 +43,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
     ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as unknown as BufferSource, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     key,
     256,
   );
@@ -87,7 +87,7 @@ export async function verifySessionToken(
   const valid = await crypto.subtle.verify(
     "HMAC",
     key,
-    base64ToBytes(sig),
+    base64ToBytes(sig) as unknown as BufferSource,
     new TextEncoder().encode(body),
   );
   if (!valid) return null;

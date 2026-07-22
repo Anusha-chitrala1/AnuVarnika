@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppProvider";
 import { productImageUrl } from "@/lib/productImage";
@@ -16,6 +16,12 @@ export default function CartPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (auth.customer?.email && !email) {
+      queueMicrotask(() => setEmail(auth.customer?.email ?? ""));
+    }
+  }, [auth.customer?.email, email]);
 
   const handleCheckout = async (event: FormEvent) => {
     event.preventDefault();
@@ -32,7 +38,6 @@ export default function CartPage() {
             productId: item.product.id,
             quantity: item.quantity,
           })),
-          customerId: auth.customer?.id,
         },
         auth.token ?? undefined,
       );
@@ -90,9 +95,12 @@ export default function CartPage() {
                       min={1}
                       max={item.product.stock}
                       value={item.quantity}
-                      onChange={(event) =>
-                        cart.updateQuantity(item.product.id, Number(event.target.value))
-                      }
+                      onChange={(event) => {
+                        const quantity = Number.parseInt(event.target.value, 10);
+                        if (Number.isInteger(quantity) && quantity > 0) {
+                          cart.updateQuantity(item.product.id, quantity);
+                        }
+                      }}
                       className="w-16 rounded-lg border border-[#D8C3A5] px-2 py-1 text-center"
                     />
                     <button

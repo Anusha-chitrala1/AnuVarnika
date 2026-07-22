@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
     "deploy": "unset CLOUDFLARE_API_TOKEN && wrangler deploy",
     "db:local": "unset CLOUDFLARE_API_TOKEN && wrangler d1 execute anuvarnika_db --local --file=schema.sql",
     "db:remote": "unset CLOUDFLARE_API_TOKEN && wrangler d1 execute anuvarnika_db --remote --file=schema.sql"

@@ -90,16 +90,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [wishlistItems, setWishlistItems] = useState<Product[]>([]);
 
   useEffect(() => {
-    setCartItems(readCart());
-    setWishlistItems(readWishlist());
+    queueMicrotask(() => {
+      setCartItems(readCart());
+      setWishlistItems(readWishlist());
+    });
 
     const stored = getStoredAuth();
     if (!stored) {
-      setAuthLoading(false);
+      queueMicrotask(() => setAuthLoading(false));
       return;
     }
-    setCustomer(stored.customer);
-    setToken(stored.token);
+    queueMicrotask(() => {
+      setCustomer(stored.customer);
+      setToken(stored.token);
+    });
     fetchCurrentUser(stored.token)
       .then(({ customer: fresh }) => setCustomer(fresh))
       .catch(() => {
@@ -139,16 +143,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addItem = useCallback((product: Product, quantity = 1) => {
+    if (product.stock < 1 || !Number.isInteger(quantity) || quantity < 1) return;
     setCartItems((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
         return prev.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: Math.min(item.quantity + quantity, product.stock) }
+            ? { ...item, product, quantity: Math.min(item.quantity + quantity, product.stock) }
             : item,
         );
       }
-      return [...prev, { product, quantity: Math.min(quantity, product.stock) }];
+          return [...prev, { product, quantity: Math.min(quantity, product.stock) }];
     });
   }, []);
 
@@ -157,6 +162,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateQuantity = useCallback((productId: string, quantity: number) => {
+    if (!Number.isInteger(quantity) || quantity < 1) return;
     setCartItems((prev) =>
       prev
         .map((item) => {

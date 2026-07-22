@@ -2,15 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { useApp } from "@/context/AppProvider";
 import { productImageUrl } from "@/lib/productImage";
 import { formatPrice, getProducts, type Product } from "@/services/api";
 
-export default function ProductsPage() {
+function ProductsContent() {
   const { cart, wishlist } = useApp();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
-  const [category, setCategory] = useState("");
+  const category = searchParams.get("category") ?? "";
+  const sort = searchParams.get("sort") ?? "";
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -18,18 +22,11 @@ export default function ProductsPage() {
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get("category");
-    if (fromUrl) setCategory(fromUrl);
-  }, []);
-
-  useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
     getProducts({
       category: category || undefined,
       search: query || undefined,
+      sort: sort || undefined,
     })
       .then((result) => {
         if (active) setProducts(result.products);
@@ -43,7 +40,7 @@ export default function ProductsPage() {
     return () => {
       active = false;
     };
-  }, [category, query]);
+  }, [category, query, sort]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -94,7 +91,13 @@ export default function ProductsPage() {
               <span className="sr-only">Filter by category</span>
               <select
                 value={category}
-                onChange={(event) => setCategory(event.target.value)}
+                onChange={(event) => {
+                  setLoading(true);
+                  const next = event.target.value;
+                  router.replace(
+                    next ? `/products?category=${encodeURIComponent(next)}` : "/products",
+                  );
+                }}
                 className="w-full rounded-full border border-[#D8C3A5] bg-white px-5 py-3 outline-none focus:ring-2 focus:ring-[#8B5A2B] sm:w-auto"
               >
                 <option value="">All collections</option>
@@ -192,5 +195,13 @@ export default function ProductsPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#FFFDF8] px-6 py-16 text-center text-gray-600">Loading the collection…</main>}>
+      <ProductsContent />
+    </Suspense>
   );
 }

@@ -22,7 +22,8 @@ export type CategorySummary = {
   product_count: number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:8787" : "");
 
 const AUTH_KEY = "anuvarnika_auth";
 
@@ -57,7 +58,19 @@ async function apiFetch<T>(
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(new URL(path, API_URL), { ...init, headers });
+  if (!API_URL) throw new Error("The storefront API is not configured.");
+  let url: URL;
+  try {
+    url = new URL(path, API_URL);
+  } catch {
+    throw new Error("The storefront API URL is invalid.");
+  }
+  let response: Response;
+  try {
+    response = await fetch(url, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(15000) });
+  } catch {
+    throw new Error("Unable to reach the storefront. Please try again.");
+  }
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) {
     throw new Error(
@@ -69,10 +82,12 @@ async function apiFetch<T>(
   return data;
 }
 
-export async function getProducts(params?: { category?: string; search?: string }) {
+export async function getProducts(params?: { category?: string; search?: string; sort?: string }) {
+  if (!API_URL) throw new Error("The storefront API is not configured.");
   const url = new URL("/api/products", API_URL);
   if (params?.category) url.searchParams.set("category", params.category);
   if (params?.search) url.searchParams.set("search", params.search);
+  if (params?.sort) url.searchParams.set("sort", params.sort);
   const response = await fetch(url);
   if (!response.ok) throw new Error("Unable to load products");
   return (await response.json()) as { products: Product[] };
@@ -125,6 +140,18 @@ export async function placeOrder(
     body: JSON.stringify(input),
     token,
   });
+}
+
+export type OrderSummary = {
+  id: string;
+  total: number;
+  status: string;
+  shipping_address: string;
+  created_at: string;
+};
+
+export async function getOrders(token: string) {
+  return apiFetch<{ orders: OrderSummary[] }>("/api/orders", { token });
 }
 
 export function formatPrice(amountInRupees: number) {

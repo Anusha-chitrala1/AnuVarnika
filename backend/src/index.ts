@@ -33,6 +33,7 @@ const json = (data: unknown, status = 200, origin = "*") =>
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      Vary: "Origin",
     },
   });
 
@@ -49,8 +50,13 @@ function corsOrigin(request: Request, env: Env): string {
   return configured;
 }
 
-function authSecret(env: Env): string {
-  return env.AUTH_SECRET?.trim() || "anuvarnika-dev-secret-change-in-production";
+function authSecret(env: Env, request: Request): string {
+  if (env.AUTH_SECRET?.trim()) return env.AUTH_SECRET.trim();
+  const hostname = new URL(request.url).hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "anuvarnika-local-development-secret";
+  }
+  throw new Error("AUTH_SECRET is not configured");
 }
 
 export default {
@@ -58,7 +64,17 @@ export default {
     const origin = corsOrigin(request, env);
     const url = new URL(request.url);
 
-    if (request.method === "OPTIONS") return json(null, 204, origin);
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": origin,
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          Vary: "Origin",
+        },
+      });
+    }
 
     try {
       if (url.pathname === "/" && request.method === "GET") {
@@ -89,12 +105,14 @@ export default {
       if (url.pathname === "/api/products" && request.method === "GET") {
         const category = url.searchParams.get("category");
         const search = url.searchParams.get("search");
+        const sort = url.searchParams.get("sort");
+        const orderBy = sort === "newest" ? "created_at DESC" : "featured DESC, created_at DESC";
         const result = await env.DB.prepare(
           `SELECT id, name, slug, description, category, price, compare_at_price,
              image_url, stock, featured FROM products
            WHERE (? IS NULL OR category = ?)
              AND (? IS NULL OR name LIKE '%' || ? || '%' OR description LIKE '%' || ? || '%')
-           ORDER BY featured DESC, created_at DESC`,
+           ORDER BY ${orderBy}`,
         )
           .bind(category, category, search, search, search)
           .all<Product>();
@@ -113,7 +131,7 @@ export default {
         const name = body.name?.trim();
         const email = body.email?.trim().toLowerCase();
         const password = body.password ?? "";
-        if (!name || !email?.includes("@") || password.length < 6) {
+        if (!name || name.length > 100 || !email?.includes("@") || email.length > 254 || password.length < 6 || password.length > 128) {
           return json(
             { error: "Name, valid email, and a password of at least 6 characters are required." },
             400,
@@ -133,7 +151,7 @@ export default {
         )
           .bind(customerId, name, email, passwordHash)
           .run();
-        const token = await createSessionToken(customerId, authSecret(env));
+        const token = await createSessionToken(customerId, authSecret(env, request));
         return json(
           {
             token,
@@ -148,7 +166,7 @@ export default {
         const body = await request.json<{ email?: string; password?: string }>();
         const email = body.email?.trim().toLowerCase();
         const password = body.password ?? "";
-        if (!email?.includes("@") || !password) {
+        if (!email?.includes("@") || email.length > 254 || !password || password.length > 128) {
           return json({ error: "Email and password are required." }, 400, origin);
         }
         const customer = await env.DB.prepare(
@@ -159,7 +177,7 @@ export default {
         if (!customer || !(await verifyPassword(password, customer.password_hash))) {
           return json({ error: "Invalid email or password." }, 401, origin);
         }
-        const token = await createSessionToken(customer.id, authSecret(env));
+        const token = await createSessionToken(customer.id, authSecret(env, request));
         return json(
           {
             token,
@@ -173,7 +191,7 @@ export default {
       if (url.pathname === "/api/auth/me" && request.method === "GET") {
         const token = bearerToken(request);
         if (!token) return json({ error: "Unauthorized" }, 401, origin);
-        const session = await verifySessionToken(token, authSecret(env));
+        const session = await verifySessionToken(token, authSecret(env, request));
         if (!session) return json({ error: "Invalid or expired session." }, 401, origin);
         const customer = await env.DB.prepare("SELECT id, name, email FROM customers WHERE id = ?")
           .bind(session.customerId)
@@ -188,7 +206,7 @@ export default {
           email?: string;
           message?: string;
         }>();
-        if (!body.name?.trim() || !body.email?.includes("@") || !body.message?.trim()) {
+        if (!body.name?.trim() || body.name.trim().length > 100 || !body.email?.includes("@") || body.email.length > 254 || !body.message?.trim() || body.message.trim().length > 5000) {
           return json({ error: "Name, valid email, and message are required." }, 400, origin);
         }
         await env.DB.prepare(
@@ -206,7 +224,7 @@ export default {
           shippingAddress?: string;
           items?: Array<{ productId?: string; quantity?: number }>;
         }>();
-        if (!body.email?.includes("@") || !body.shippingAddress?.trim() || !body.items?.length) {
+        if (!body.email?.includes("@") || body.email.length > 254 || !body.shippingAddress?.trim() || body.shippingAddress.trim().length > 500 || !body.items?.length || body.items.length > 50) {
           return json(
             { error: "Email, shipping address, and at least one item are required." },
             400,
@@ -214,56 +232,82 @@ export default {
           );
         }
 
-        let customerId = body.customerId ?? null;
+        let customerId: string | null = null;
         const token = bearerToken(request);
         if (token) {
-          const session = await verifySessionToken(token, authSecret(env));
+          const session = await verifySessionToken(token, authSecret(env, request));
           if (session) customerId = session.customerId;
         }
 
-        const orderItems: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
+        const quantities = new Map<string, number>();
         for (const item of body.items) {
-          if (!item.productId || !Number.isInteger(item.quantity) || item.quantity < 1) {
+          const quantity = item.quantity;
+          if (!item.productId || typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1) {
             return json({ error: "Each item needs a valid product and quantity." }, 400, origin);
           }
+          quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + quantity);
+        }
+
+        const orderItems: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
+        for (const [productId, quantity] of quantities) {
           const product = await env.DB.prepare("SELECT id, price, stock FROM products WHERE id = ?")
-            .bind(item.productId)
+            .bind(productId)
             .first<{ id: string; price: number; stock: number }>();
-          if (!product || product.stock < item.quantity) {
-            return json({ error: `Product ${item.productId} is unavailable.` }, 409, origin);
+          if (!product || product.stock < quantity) {
+            return json({ error: `Product ${productId} is unavailable.` }, 409, origin);
           }
-          orderItems.push({ productId: product.id, quantity: item.quantity, unitPrice: product.price });
+          orderItems.push({ productId: product.id, quantity, unitPrice: product.price });
         }
 
         const total = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
         const orderId = id();
-        const statements = [
+        const reservationResults = await env.DB.batch(
+          orderItems.map((item) =>
+            env.DB.prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?").bind(
+              item.quantity,
+              item.productId,
+              item.quantity,
+            ),
+          ),
+        );
+        if (reservationResults.some((result) => result.meta.changes !== 1)) {
+          await env.DB.batch(
+            orderItems.map((item, index) =>
+              reservationResults[index].meta.changes === 1
+                ? env.DB.prepare("UPDATE products SET stock = stock + ? WHERE id = ?").bind(item.quantity, item.productId)
+                : env.DB.prepare("SELECT 1"),
+            ),
+          );
+          return json({ error: "One or more products became unavailable. Please refresh your bag." }, 409, origin);
+        }
+        await env.DB.batch([
           env.DB.prepare(
             "INSERT INTO orders (id, customer_id, email, total, shipping_address) VALUES (?, ?, ?, ?, ?)",
-          ).bind(
-            orderId,
-            customerId,
-            body.email.trim().toLowerCase(),
-            total,
-            body.shippingAddress.trim(),
-          ),
-          ...orderItems.flatMap((item) => [
+          ).bind(orderId, customerId, body.email.trim().toLowerCase(), total, body.shippingAddress.trim()),
+          ...orderItems.map((item) =>
             env.DB.prepare(
               "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
             ).bind(orderId, item.productId, item.quantity, item.unitPrice),
-            env.DB.prepare("UPDATE products SET stock = stock - ? WHERE id = ?").bind(
-              item.quantity,
-              item.productId,
-            ),
-          ]),
-        ];
-        await env.DB.batch(statements);
+          ),
+        ]);
         return json({ order: { id: orderId, total, status: "pending" } }, 201, origin);
+      }
+
+      if (url.pathname === "/api/orders" && request.method === "GET") {
+        const token = bearerToken(request);
+        if (!token) return json({ error: "Unauthorized" }, 401, origin);
+        const session = await verifySessionToken(token, authSecret(env, request));
+        if (!session) return json({ error: "Invalid or expired session." }, 401, origin);
+        const result = await env.DB.prepare(
+          "SELECT id, total, status, shipping_address, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50",
+        ).bind(session.customerId).all();
+        return json({ orders: result.results }, 200, origin);
       }
 
       return json({ error: "Not found" }, 404, origin);
     } catch (error) {
       console.error(error);
+      if (error instanceof SyntaxError) return json({ error: "Invalid JSON body." }, 400, origin);
       return json({ error: "Internal server error" }, 500, origin);
     }
   },

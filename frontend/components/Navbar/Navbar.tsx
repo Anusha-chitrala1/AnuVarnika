@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { NAVIGATION_LINKS } from "@/constants/navigation";
 import { COMPANY } from "@/constants/theme";
 import { useApp } from "@/context/AppProvider";
 
 export default function Navbar() {
   const { auth, cart, wishlist } = useApp();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-[#D8C3A5] bg-[#FFFDF8]/95 backdrop-blur">
@@ -29,6 +31,16 @@ export default function Navbar() {
             </Link>
           ))}
         </div>
+
+        <button
+          type="button"
+          className="order-3 rounded-lg border border-[#D8C3A5] px-3 py-2 text-sm text-[#5A3A1B] md:hidden"
+          aria-expanded={menuOpen}
+          aria-controls="mobile-navigation"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          Menu
+        </button>
 
         <div className="flex items-center gap-3 sm:gap-4">
           <Link href="/wishlist" className="text-sm text-[#5A3A1B] sm:text-base">
@@ -65,6 +77,22 @@ export default function Navbar() {
           )}
         </div>
       </div>
+      {menuOpen && (
+        <div id="mobile-navigation" className="border-t border-[#E7D8C3] px-6 py-4 md:hidden">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3" aria-label="Mobile navigation">
+            {NAVIGATION_LINKS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className="font-medium text-[#5A3A1B]"
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

@@ -9,11 +9,11 @@ export const NAVIGATION_LINKS = [
   },
   {
     name: "New Arrivals",
-    href: "/products",
+    href: "/products?sort=newest",
   },
   {
     name: "Best Sellers",
-    href: "/products",
+    href: "/products?sort=featured",
   },
   {
     name: "About Us",

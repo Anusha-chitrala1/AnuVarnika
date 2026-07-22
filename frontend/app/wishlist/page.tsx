@@ -45,10 +45,11 @@ export default function WishlistPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
+                    disabled={product.stock < 1}
                     onClick={() => cart.addItem(product)}
-                    className="rounded-full bg-[#8B5A2B] px-4 py-2 text-sm text-white"
+                    className="rounded-full bg-[#8B5A2B] px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Add to bag
+                    {product.stock > 0 ? "Add to bag" : "Out of stock"}
                   </button>
                   <button
                     type="button"
